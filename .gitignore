@@ -30,3 +30,7 @@
 *.exe
 *.out
 *.app
+
+# added by us, not GitHub
+.DS_Store
+src/.vscode/
