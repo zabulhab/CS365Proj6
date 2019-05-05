@@ -34,5 +34,9 @@ BINDIR = ../bin
 
 main: main.o
 	$(CC) $^ -o $(BINDIR)/$@ $(LDFLAGS) $(LDLIBS)
+
+temp: temp.o
+	$(CC) $^ -o $(BINDIR)/$@ $(LDFLAGS) $(LDLIBS)
+
 clean:
 	rm -f *.o *~ 
