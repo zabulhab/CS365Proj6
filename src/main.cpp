@@ -59,8 +59,6 @@ int openVidFile(const char* vidName)
 
 	Mat frame, grayFrame;
 
-    vector<Point2f> oldPoints;
-
     // feature params for good features to track
     int maxCorners = 100;
     double qualityLevel = 0.3;
@@ -115,7 +113,7 @@ int openVidFile(const char* vidName)
         // draw the tracks
         for (int i = 0; i < goodOldPoints.size(); i++)
         {
-            Point2f lineStart, lineEnd; //       thickness
+            Point2f lineStart, lineEnd;
             lineStart = goodOldPoints[i];
             lineEnd = goodNewPoints[i];
             line( frame, lineStart, lineEnd, green, 2 );
@@ -131,8 +129,9 @@ int openVidFile(const char* vidName)
 		    break;
 		}
 
+        // TODO: find a way to keep drawn lines from last frame
         // Make the current frame the old frame in the next iteration
-        oldGrayFrame = Mat(grayFrame);
+        oldGrayFrame = grayFrame.clone();
         // Update the coordinates of the old good points
         oldPointLocations = goodNewPoints;
 	}
