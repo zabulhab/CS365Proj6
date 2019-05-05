@@ -32,17 +32,7 @@ LDLIBS = -lopencv_core -lopencv_highgui -lopencv_video -lopencv_videoio -lopencv
 
 BINDIR = ../bin
 
-calibration: calibration.o
+main: main.o
 	$(CC) $^ -o $(BINDIR)/$@ $(LDFLAGS) $(LDLIBS)
-
-arSystem: arSystem.o
-	$(CC) $^ -o $(BINDIR)/$@ $(LDFLAGS) $(LDLIBS)
-
-harrisCorners: harrisCorners.o
-	$(CC) $^ -o $(BINDIR)/$@ $(LDFLAGS) $(LDLIBS)
-
-extension2: extension2.o
-	$(CC) $^ -o $(BINDIR)/$@ $(LDFLAGS) $(LDLIBS)
-
 clean:
 	rm -f *.o *~ 
