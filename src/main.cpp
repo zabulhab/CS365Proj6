@@ -129,6 +129,8 @@ int openVidFile(const char* vidName)
 		if(key == 'q') {
 		    break;
 		}
+
+        oldGrayFrame = Mat(grayFrame);
 	}
 
     delete savedVid;
