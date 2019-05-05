@@ -14,7 +14,6 @@
 #include <cstdlib>
 #include <dirent.h>
 #include <vector>
-//#include <algorithm>
 #include <numeric>
 #include <ctype.h>
 #include <iostream>
@@ -53,9 +52,9 @@ int openVidFile(const char* vidName)
 	namedWindow("Video", 1);
 
     // read the first frame to get the initial corner coordinates
-    Mat oldGrayFrame;
-    savedVid->read(oldGrayFrame);
-    cvtColor(oldGrayFrame, oldGrayFrame, COLOR_BGR2GRAY);
+    Mat oldFrame, oldGrayFrame;
+    savedVid->read(oldFrame);
+    cvtColor(oldFrame, oldGrayFrame, COLOR_BGR2GRAY);
 
 	Mat frame, grayFrame;
 
@@ -72,6 +71,8 @@ int openVidFile(const char* vidName)
     //                    B  G  R
     Scalar green = Scalar(0,255,0); // for line color
 
+    //Mat to store pixel flow trails in, to draw over each frame
+    Mat trailImage = Mat::zeros(oldFrame.size(), oldFrame.type());
 
 	for(;;) {
 		// get a new frame from the camera
@@ -110,14 +111,17 @@ int openVidFile(const char* vidName)
             }
         }
 
-        // draw the tracks
+        // draw the new flow tracks into the trail image
         for (int i = 0; i < goodOldPoints.size(); i++)
         {
             Point2f lineStart, lineEnd;
             lineStart = goodOldPoints[i];
             lineEnd = goodNewPoints[i];
-            line( frame, lineStart, lineEnd, green, 2 );
+            line( trailImage, lineStart, lineEnd, green, 2 );
         }
+
+        //draw the trail image onto the current frame
+        add(frame, trailImage, frame);
 
         imshow("Video", frame);
 
