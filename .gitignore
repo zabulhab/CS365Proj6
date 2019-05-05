@@ -30,4 +30,12 @@
 *.exe
 *.out
 *.app
+
+# added by us, not GitHub
+src/.vscode/
 bin/
+*.DS_Store
+*.log
+*.o
+.vscode/
+*.json
