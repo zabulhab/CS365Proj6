@@ -92,10 +92,10 @@ int openVidFile(const char* vidName)
         vector<float> error;
 
 
+
         calcOpticalFlowPyrLK(oldGrayFrame, grayFrame, oldPointLocations, newPointLocations, 
                                             status, error, winSize, maxLevel, criteria);
 
-                                            // error
 
         // The points we actually found flow between
         vector<Point2f> goodNewPoints;
@@ -126,11 +126,15 @@ int openVidFile(const char* vidName)
         //check for user keyboard input
         char key = waitKey(10);
         
-		if(key == 'q') {
+		if(key == 'q') 
+        {
 		    break;
 		}
 
+        // Make the current frame the old frame in the next iteration
         oldGrayFrame = Mat(grayFrame);
+        // Update the coordinates of the old good points
+        oldPointLocations = goodNewPoints;
 	}
 
     delete savedVid;
