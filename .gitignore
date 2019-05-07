@@ -39,3 +39,4 @@ bin/
 *.o
 .vscode/
 *.json
+src/temp.cpp

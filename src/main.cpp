@@ -22,6 +22,74 @@
 using namespace std;
 using namespace cv;
 
+struct CallbackParams
+{
+    vector<Point2f> *pointVectorOutput; //vector to store points into
+    Mat *drawTo; //image to draw click points onto
+};
+
+Scalar green = Scalar(0,255,0); // for line/circle color
+
+/**
+ * Callback function for window created in getPointsToTrack,
+ * which stores click locations into a specified vector and draws
+ * dots there in a specified image, based on the given CallbackParams
+ */
+void mouseCallbackFunc(int event, int x, int y, int flags, void* userdata)
+{
+     CallbackParams *cbParams = (CallbackParams *)userdata;
+     vector<Point2f> *clickPoints = cbParams->pointVectorOutput;
+     Mat *frame = cbParams->drawTo;
+     
+     //on left click, store location
+     if  ( event == EVENT_LBUTTONDOWN )
+     {
+          cout << "Storing point at (" << x << ", " << y << ")" << endl;
+          clickPoints->push_back( Point2f(x, y) );
+
+          //draw dot for click point
+          circle(*frame, Point2f(x, y), 2, green, -1);
+          imshow("Initial Frame", *frame);
+     }
+}
+
+/**
+ * Opens a window with the given video frame and prompts the user
+ * to select points to track
+ * Returns these selected points in the given output vector
+ */
+void getPointsToTrack(Mat &frame, vector<Point2f> &outputVector)
+{
+    Mat frameCopy(frame);
+
+    cout << "Displaying initial frame; please select points to track by clicking\n";
+    cout << "Press 'd' to complete point selection\n";
+
+    namedWindow("Initial Frame", 1);
+
+    CallbackParams cbParams;
+    cbParams.pointVectorOutput = &outputVector;
+    cbParams.drawTo = &frame;
+    setMouseCallback("Initial Frame", mouseCallbackFunc, &cbParams); //set the callback function for any mouse event
+
+    imshow("Initial Frame", frameCopy);
+
+    while(true)
+    {
+        //check for user keyboard input
+        char key = waitKey(10);
+        if(key == 'd') 
+        {
+		    break;
+		}
+    }
+
+    destroyWindow("Initial Frame");
+
+    print(outputVector);
+    cout << "\n";
+}
+
 int openVidFile(const char* vidName)
 {
 
@@ -59,10 +127,8 @@ int openVidFile(const char* vidName)
 
     vector<Point2f> oldPointLocations;
 
-    goodFeaturesToTrack(oldGrayFrame, oldPointLocations, maxCorners, qualityLevel, minDistance);
-    print(oldPointLocations);
-    string ugh;
-    cin >> ugh;
+    getPointsToTrack(oldFrame, oldPointLocations);
+    //goodFeaturesToTrack(oldGrayFrame, oldPointLocations, maxCorners, qualityLevel, minDistance);
 
     // Parameters for lucas-kanade method
     Size winSize = Size(15,15);
