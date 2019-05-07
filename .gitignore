@@ -34,10 +34,12 @@
 # added by us, not GitHub
 src/.vscode/
 bin/
+.vscode/
+src/.idea/
+
 *.DS_Store
 *.log
 *.o
-.vscode/
 *.json
 src/temp.cpp
 src/farnebackExample.cpp
