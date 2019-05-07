@@ -45,22 +45,51 @@ def main(argv):
 		nextGray = cv.cvtColor(frame2, cv.COLOR_BGR2GRAY)
 		flow = cv.calcOpticalFlowFarneback(prevGray, nextGray, None, 0.5, 3, 15, 3, 5, 1.2, 0)
 		
-		#TODO: make trails
+		#TODO: make trails & remove confetti
 		# turn flow vector info into HSV color info
-		mag, ang = cv.cartToPolar(flow[...,0], flow[...,1])
-		hsvBlobs[...,0] = ang*180/np.pi/2 # angle => hue
-		hsvBlobs[...,2] = cv.normalize(mag, None, 0, 255, cv.NORM_MINMAX) # magnitude => value
+		mag, ang = cv.cartToPolar(flow[...,0], flow[...,1]) # vector magnitudes, angles
+		
+		# vector angle => hue
+		angDegrees = ang*180/np.pi/2 # convert radians to degrees
+		hsvBlobs[...,0] = angDegrees
+		
+		# vector magnitude => value
+		magNormalized = cv.normalize(mag, None, 0, 255, cv.NORM_MINMAX)
+		magThreshold = 5.
+		mask = magNormalized > magThreshold # at each index, boolean value for whether > threshold
+		
+		# uncomment for displayable version of mask
+		# mask = mask.astype(np.float)
+		# maskNorm = mask * 255
+		
+		for i in range(mask.shape[0]):
+			for j in range(mask.shape[1]):
+				if mask[i][j]:
+					hsvBlobs[i,j,2] = magNormalized[i,j]
+				# else:
+				# 	hsvBlobs[ i, j, 2 ] = 255
+		
+		# version of code using nonzero condition instead of > threshold (includes too much of image)
+		# magNonZero = np.nonzero(magNormalized) # indices of non-zero magnitude values
+		# magNonZeroIDX = np.transpose( magNonZero ) # transpose indices to be organized by element
+		# magNonZeroValues = magNormalized[magNonZero] # non-zero magnitude values
+		# for idx,val in zip(magNonZeroIDX, magNonZeroValues):
+		# 	hsvBlobs[idx[0],idx[1],2] = val
+		# original version, just take full blob image (including black space, overwriting previous contents)
+		#hsvBlobs[...,2] = magNormalized[...,2]
 		
 		bgr = cv.cvtColor(hsvBlobs, cv.COLOR_HSV2BGR)
-		display = cv.add(frame2, bgr) # draw flow blobs over original frame
-		cv.imshow('frame2', display)
+		cv.imshow( 'frame2', bgr )
+		#display = cv.add(frame2, bgr) # draw flow blobs over original frame
+		#cv.imshow('frame2', display)
 		
-		k = cv.waitKey(30) & 0xff
-		if k == 27:
-			break
-		elif k == ord('s'): # save frames on key press
-			cv.imwrite('opticalfb.png', frame2)
-			cv.imwrite('opticalhsv.png', bgr)
+		k = cv.waitKey(1000) & 0xff
+		# k = cv.waitKey(30) & 0xff
+		# if k == 27:
+		# 	break
+		# elif k == ord('s'): # save frames on key press
+		# 	cv.imwrite('opticalfb.png', frame2)
+		# 	cv.imwrite('opticalhsv.png', bgr)
 		
 		prevGray = nextGray
 	
