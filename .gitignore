@@ -40,3 +40,5 @@ bin/
 .vscode/
 *.json
 src/temp.cpp
+src/farnebackExample.cpp
+src/fback.cpp
