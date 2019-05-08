@@ -47,12 +47,13 @@ def main(argv):
 		
 		#TODO: make trails & remove confetti
 		# get flow vector info to turn into HSV color info
-		mag, ang = cv.cartToPolar(flow[...,0], flow[...,1]) # vector magnitudes, angles
+		mag, ang = cv.cartToPolar(flow[...,0], flow[...,1]) # output: vector magnitudes, angles
 		
 		# if flow is big enough
 		# (ignores frames w/ almost no motion where very small flow values get normalized way too high,
 		# resulting in frames w/ confetti)
-		if mag.max() > 5.:
+		print("mag max", mag.max())
+		if mag.max() > 50.:
 			# vector angle => hue
 			angDegrees = ang*180/np.pi/2 # convert radians to degrees
 			hsvBlobs[...,0] = angDegrees
@@ -63,18 +64,19 @@ def main(argv):
 			mask = magNormalized > magThreshold # at each index, boolean value for whether > threshold
 			
 			# uncomment for displayable version of mask
-			# mask = mask.astype(np.float)
-			# maskNorm = mask * 255
+			mask = mask.astype(np.float)
+			maskNorm = mask * 255
+			cv.imshow( 'blob mask', maskNorm )
 			
 			for i in range(mask.shape[0]):
 				for j in range(mask.shape[1]):
 					if mask[i][j]:
 						hsvBlobs[i,j,2] = magNormalized[i,j]
 			
-		bgr = cv.cvtColor(hsvBlobs, cv.COLOR_HSV2BGR)
-		#cv.imshow( 'BLOBS', bgr ) # uncomment to display just blobs
-		display = cv.add(frame2, bgr) # draw flow blobs over original frame
-		cv.imshow('optical flow', display)
+		bgrBlobs = cv.cvtColor(hsvBlobs, cv.COLOR_HSV2BGR)
+		#cv.imshow( 'BLOBS', bgrBlobs ) # uncomment to display just blobs
+		display = cv.add(frame2, bgrBlobs) # draw flow blobs over original frame
+		#cv.imshow('optical flow', display)
 		
 		#k = cv.waitKey(1000) & 0xff
 		k = cv.waitKey(30) & 0xff

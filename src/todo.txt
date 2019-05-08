@@ -1,0 +1,5 @@
+- consider changing how it works
+    - have user click in the area of the objects to track
+    - have OpenCV find the boundaries of the objects
+    - keep the existing code for dense optical flow,
+        but only pay attention to the values for the pixels in the object boundary
