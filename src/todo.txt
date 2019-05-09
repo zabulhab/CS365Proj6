@@ -3,3 +3,4 @@
     - have OpenCV find the boundaries of the objects
     - keep the existing code for dense optical flow,
         but only pay attention to the values for the pixels in the object boundary
+    - take convex hull of blob to determine where to put text

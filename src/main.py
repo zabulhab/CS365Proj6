@@ -12,6 +12,94 @@ Project 6
 import sys
 import cv2 as cv
 import numpy as np
+import random
+
+green = (0, 255, 0)
+
+def getContourFromInteriorPoint(point, contours):
+	largestContourIDX = 0
+	largestContourArea = 0
+	for i in range( len( contours ) ):
+		inContour = cv.pointPolygonTest( contours[i], point, False )  # False => don't measure distance to edge
+		
+		thisContourArea = cv.contourArea( contours[i] )
+		if inContour and thisContourArea > largestContourArea:
+			largestContourIDX = i
+			largestContourArea = thisContourArea
+	
+	if largestContourArea != 0:
+		return contours[largestContourIDX]
+	else:
+		return None
+
+def onMouseClick(event, x, y, flags, param):
+	clickPts = param["pointList"]
+	frame = param["frame"]
+	contours = param["contours"]
+	
+	if event == cv.EVENT_LBUTTONDOWN: # mouse left click
+		pt = (x, y)
+		clickPts.append( pt )
+		cv.circle(frame, pt, 2, green)
+		
+		# get contour and draw it
+		contour = getContourFromInteriorPoint(pt, contours)
+		cv.drawContours(frame, [contour], 0, green)
+		
+
+#TODO: should this be for selecting multiple or just one?
+def selectObjects(frame):
+	frameCopy = frame.copy()
+	grayFrame = cv.cvtColor(frame, cv.COLOR_BGR2GRAY)
+	threshold = 127
+	maxVal = 255
+	#ret, thresholdFrame = cv.threshold(grayFrame, threshold, maxVal, cv.THRESH_BINARY)
+	blockSize = 11
+	c = 2 # "just a constant subtracted from the mean"
+	thresholdFrame = cv.adaptiveThreshold(grayFrame, maxVal, cv.ADAPTIVE_THRESH_GAUSSIAN_C,
+										  cv.THRESH_BINARY, blockSize, c)
+	#											src				retrieval mode, approximation method
+	im2, contours, hierarchy = cv.findContours( thresholdFrame, cv.RETR_TREE,   cv.CHAIN_APPROX_SIMPLE )
+	
+	cv.namedWindow( "initial frame" )
+	clickCoords = []
+	param = { "pointList": clickCoords, "frame": frameCopy, "contours": contours }
+	cv.setMouseCallback( "initial frame", onMouseClick, param )
+	
+	for i in range(len(contours)):
+		cv.drawContours(frameCopy, contours, i, (random.randint(0, 256), random.randint(0, 256), random.randint(0, 256)))
+	cv.imshow("initial frame", frameCopy)
+	
+	# keep looping until the 'q' key is pressed
+	while True:
+		# display the image and wait for a keypress
+		cv.imshow( "initial frame", frameCopy )
+		key = cv.waitKey( 1 ) & 0xFF
+		
+		# if the 'q' key is pressed, break from the loop
+		if key == ord( "q" ):
+			break
+	
+	objContours = []
+	for point in clickCoords:
+		for i in range(len(contours)):
+			inContour = cv.pointPolygonTest(contours[i], point, False) # False => don't measure distance to edge
+			
+			if inContour:
+				objContours.append(contours[i])
+	
+	# close window
+	cv.destroyWindow("initial frame")
+	
+	'''
+	get all contours in image as in OR system
+	store user click point(s)
+	test against all contours w/ pointPolygonTest to figure out which one it's in
+	draw in selected contour
+	return selected contour/list of selected contours?
+	'''
+	
+	return
 
 def main(argv):
 	# check for command-line argument
@@ -29,6 +117,9 @@ def main(argv):
 	# read in first frame
 	ret, frame1 = cap.read()
 	prevGray = cv.cvtColor(frame1,cv.COLOR_BGR2GRAY)
+	
+	selectObjects(frame1)
+	input("AHA") # temp just for pausing
 	
 	# initialize array for HSV representation of flow blobs
 	hsvBlobs = np.zeros_like(frame1)
