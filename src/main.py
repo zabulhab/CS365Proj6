@@ -65,7 +65,7 @@ def onMouseClick(event, x, y, flags, param):
 	boxPts = param["boxPts"]
 	
 	if event == cv.EVENT_LBUTTONDOWN: # drag start
-		box = [x, y, 0, 0]
+		box = {"x1": int(x), "y1": int(y)}
 		boxPts.append( box )
 		# cv.circle(frame, pt, 2, green)
 		#
@@ -75,14 +75,18 @@ def onMouseClick(event, x, y, flags, param):
 		# cv.drawContours(frame, [contour], 0, green)
 	elif event == cv.EVENT_LBUTTONUP: # drag end
 		thisBox = boxPts[-1]
-		thisBox[2] = x
-		thisBox[3] = y
+		thisBox["x2"] = int(x)
+		thisBox["y2"] = int(y)
 		
 		# draw box
-		cv.line( frame, (thisBox[0], thisBox[1]), (thisBox[0], thisBox[3]), green, thickness=2 )
-		cv.line( frame, (thisBox[0], thisBox[1]), (thisBox[2], thisBox[1]), green, thickness=2 )
-		cv.line( frame, (thisBox[0], thisBox[3]), (thisBox[2], thisBox[3]), green, thickness=2 )
-		cv.line( frame, (thisBox[2], thisBox[1]), (thisBox[2], thisBox[3]), green, thickness=2 )
+		cv.line( frame, (thisBox["x1"], thisBox["y1"]),
+				 (thisBox["x1"], thisBox["y2"]), green, thickness=2 )
+		cv.line( frame, (thisBox["x1"], thisBox["y1"]),
+				 (thisBox["x2"], thisBox["y1"]), green, thickness=2 )
+		cv.line( frame, (thisBox["x1"], thisBox["y2"]),
+				 (thisBox["x2"], thisBox["y2"]), green, thickness=2 )
+		cv.line( frame, (thisBox["x2"], thisBox["y1"]),
+				 (thisBox["x2"], thisBox["y2"]), green, thickness=2 )
 		
 
 #TODO: should this be for selecting multiple or just one?
@@ -211,8 +215,27 @@ def main(argv):
 		
 		#TODO: aaaaaaa just added
 		for box in boxPts:
-			boxAvgFlow = np.mean( flow[box[0]:box[2], box[1]:box[3]] )
+			# get average flow across object bbox in x and y directions
+			print(box)
+			print(flow.shape)
+			print("YEESH", flow[box["y1"]:box["y2"], box["x1"]:box["x2"], 0].shape)
+			print()
+			boxAvgXFlow = np.mean( flow[box["y1"]:box["y2"], box["x1"]:box["x2"], 0] )
+			boxAvgYFlow = np.mean( flow[box["y1"]:box["y2"], box["x1"]:box["x2"], 1] )
+			print("average flow:", boxAvgXFlow, boxAvgYFlow)
 			
+			# move bbox
+			box["x1"] += int(boxAvgXFlow)
+			box["x2"] += int(boxAvgXFlow)
+			box["y1"] += int(boxAvgYFlow)
+			box["y2"] += int(boxAvgYFlow)
+		
+			# draw moved box into blob image
+			print(type(box["y1"]), box["y1"])
+			for i in range(box["y1"], box["y2"]):
+				for j in range(box["x1"], box["x2"]):
+					hsvBlobs[i, j, 0] = 255
+					hsvBlobs[i, j, 2] = 255
 		
 		# #TODO: make trails & remove confetti
 		# # get flow vector info to turn into HSV color info
@@ -241,11 +264,11 @@ def main(argv):
 		# 		for j in range(mask.shape[1]):
 		# 			if mask[i][j]:
 		# 				hsvBlobs[i,j,2] = magNormalized[i,j]
-		#
-		# bgrBlobs = cv.cvtColor(hsvBlobs, cv.COLOR_HSV2BGR)
+
+		bgrBlobs = cv.cvtColor(hsvBlobs, cv.COLOR_HSV2BGR)
 		#cv.imshow( 'BLOBS', bgrBlobs ) # uncomment to display just blobs
-		# display = cv.add(frame2, bgrBlobs) # draw flow blobs over original frame
-		#cv.imshow('optical flow', display)
+		display = cv.add(frame2, bgrBlobs) # draw flow blobs over original frame
+		cv.imshow('optical flow', display)
 		
 		#k = cv.waitKey(1000) & 0xff
 		k = cv.waitKey(30) & 0xff
