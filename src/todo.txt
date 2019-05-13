@@ -4,3 +4,14 @@
     - keep the existing code for dense optical flow,
         but only pay attention to the values for the pixels in the object boundary
     - take convex hull of blob to determine where to put text
+
+- thinking about using color segmentation
+    - segment into colors (using posterizing) & get each individual color (using unique)
+    - for each color, get mask in image & get contours from mask
+    - then use same containing-contour code to figure out which contour contains click point
+- troubleshooting
+    - maybe instead of posterizing across all values, don't posterize in the value channel?
+    - maybe just hue, even
+
+- or instead, have user draw a box around the object. and use average flow across the entire box instead
+    - means no need for finding boundaries of object from color segmentation or contouring
