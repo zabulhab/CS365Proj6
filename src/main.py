@@ -16,26 +16,52 @@ import random
 
 green = (0, 255, 0)
 
-def getContourFromInteriorPoint(point, contours):
-	largestContourIDX = 0
-	largestContourArea = 0
-	for i in range( len( contours ) ):
-		inContour = cv.pointPolygonTest( contours[i], point, False )  # False => don't measure distance to edge
-		
-		thisContourArea = cv.contourArea( contours[i] )
-		if inContour and thisContourArea > largestContourArea:
-			largestContourIDX = i
-			largestContourArea = thisContourArea
+'''
+Returns the biggest contour in the given hierarchy that contains the given point
+'''
+def getContourFromInteriorPoint(point, contours, hierarchy):
+	# largestContourIDX = 0
+	# largestContourArea = 0
+	# for i in range( len( contours ) ):
+	# 	inContour = cv.pointPolygonTest( contours[i], point, False )  # False => don't measure distance to edge
+	#
+	# 	thisContourArea = cv.contourArea( contours[i] )
+	# 	if inContour > 0 and thisContourArea > largestContourArea:
+	# 		print("aaaah", inContour)
+	# 		largestContourIDX = i
+	# 		largestContourArea = thisContourArea
+	#
+	# if largestContourArea != 0:
+	# 	return contours[largestContourIDX]
+	# else:
+	# 	return None
 	
-	if largestContourArea != 0:
-		return contours[largestContourIDX]
-	else:
-		return None
+	print("hierarchy", len(hierarchy))
+	
+	currentContour = None # current best match for contour containing this point
+	for idx in range(hierarchy.shape[1]):
+		c = contours[idx]
+		parent = hierarchy[0][idx][2]
+		
+		# -1 = outside contour, 0 = on contour, 1 = in contour
+		contourTest = cv.pointPolygonTest( c, point, False )  # False => don't measure distance to edge
+		if contourTest != -1: # if point is in/on contour
+			print("HERE I AM")
+			if parent == -1: # no parent
+				currentContour = c
+			else:
+				currentContour = contours[parent]
+	
+	return currentContour
 
+'''
+Mouse click callback function for initial frame window
+'''
 def onMouseClick(event, x, y, flags, param):
 	clickPts = param["pointList"]
 	frame = param["frame"]
 	contours = param["contours"]
+	hierarchy = param["hierarchy"]
 	
 	if event == cv.EVENT_LBUTTONDOWN: # mouse left click
 		pt = (x, y)
@@ -43,7 +69,8 @@ def onMouseClick(event, x, y, flags, param):
 		cv.circle(frame, pt, 2, green)
 		
 		# get contour and draw it
-		contour = getContourFromInteriorPoint(pt, contours)
+		contour = getContourFromInteriorPoint(pt, contours, hierarchy)
+		print(contour)
 		cv.drawContours(frame, [contour], 0, green)
 		
 
@@ -60,15 +87,18 @@ def selectObjects(frame):
 										  cv.THRESH_BINARY, blockSize, c)
 	#											src				retrieval mode, approximation method
 	im2, contours, hierarchy = cv.findContours( thresholdFrame, cv.RETR_TREE,   cv.CHAIN_APPROX_SIMPLE )
+	print("aaaaa", type(hierarchy), hierarchy.shape)
+	print("bbbbb", type(contours), len(contours))
+	cv.imshow("threshold", thresholdFrame)
 	
 	cv.namedWindow( "initial frame" )
 	clickCoords = []
-	param = { "pointList": clickCoords, "frame": frameCopy, "contours": contours }
+	param = { "pointList": clickCoords, "frame": frameCopy, "contours": contours, "hierarchy": hierarchy }
 	cv.setMouseCallback( "initial frame", onMouseClick, param )
 	
-	for i in range(len(contours)):
-		cv.drawContours(frameCopy, contours, i, (random.randint(0, 256), random.randint(0, 256), random.randint(0, 256)))
-	cv.imshow("initial frame", frameCopy)
+	# for i in range(len(contours)):
+	# 	cv.drawContours(frameCopy, contours, i, (random.randint(0, 256), random.randint(0, 256), random.randint(0, 256)))
+	# cv.imshow("initial frame", frameCopy)
 	
 	# keep looping until the 'q' key is pressed
 	while True:
