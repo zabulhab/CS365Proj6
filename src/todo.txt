@@ -21,3 +21,11 @@
 - unclear if should take average flow or max flow
     - average does not work at all for hand example
     - max works kinda but gets derailed easily right now
+
+- AAAAAAAAAAAAAAAAAAAA
+- getting from selected blob outline to text generation
+    - width of text from width of blob; height proportionately scaled
+    - get furthest point of outline on edge opposite direction of motion
+    - accumulate its optical flow until it has moved far enough that words fit
+        - draw word
+    - repeat until edge moves out of frame?
