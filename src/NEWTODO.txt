@@ -1,6 +1,6 @@
 Have user select box
 Do optical flow for whole image
-Do color segmentation for similar parts inside pixels limited to area inside the ROI (the box)
+Do color segmentation of blog for similar parts inside pixels limited to area inside the ROI (the box)
 Ignore areas within the box that are small and/or erratic (ie the irregular movement)
 Get average flow for the mask of the biggest one-color blob within the square
 Use average flow to see how much object moved
