@@ -151,24 +151,7 @@ def selectObjects( frame, blobs ):
 	# close window
 	cv.destroyWindow( "initial frame" )
 	
-	'''
-	posterize blobs and get individual contours for them
-	get all contours in blob image as in OR system
-	store user click point(s)
-	test against all contours w/ pointPolygonTest to figure out which one it's in
-	draw in selected contour
-	return selected contour/list of selected contours?
-	
-	posterize?
-	or just split up by color using inRange as in clownfish example
-	then need the unique colors to split up by
-	
-	or instead just get the color of the blob at the click location,
-	and get a mask for that color, and do contours on that instead,
-	to get the contour of the specific blob
-	'''
-	
-	return boxPts
+	return contour
 
 def getBlobImage(frame1, frame2):
 	hsvBlobs = np.zeros_like( frame1 )
@@ -236,9 +219,13 @@ def main( argv ):
 	#cv.waitKey(0)
 	#input("wait")
 	
-	contoursToTrack = selectObjects( frame1, blobImage )
+	contourToTrack = selectObjects( frame1, blobImage ) #TODO: currently just 1 contour
 	input( "AHA" )  # temp just for pausing
 	prevGray = cv.cvtColor( frame2, cv.COLOR_BGR2GRAY ) # second frame => new start frame
+	
+	# image that all of the text gets accumulated in
+	textImage = np.zeros_like(frame1)
+	distanceTravelled = 0.0 # distance travelled since last text insertion
 	
 	# initialize array for HSV representation of flow blobs
 	# hsvBlobs = np.zeros_like( frame1 )
@@ -255,6 +242,10 @@ def main( argv ):
 		
 		nextGray = cv.cvtColor( frame2, cv.COLOR_BGR2GRAY )
 		flow = cv.calcOpticalFlowFarneback( prevGray, nextGray, None, 0.5, 3, 15, 3, 5, 1.2, 0 )
+		
+		# find top 10 furthest points of contour
+		# get their flow, average it to calc distance, & update all contour locations
+		
 		#TODO: aaaaaaaaaa
 		
 		# #TODO: make trails & remove confetti
