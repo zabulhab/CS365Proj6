@@ -1,0 +1,9 @@
+Have user select box
+Do optical flow for whole image
+Do color segmentation for similar parts inside pixels limited to area inside the ROI (the box)
+Ignore areas within the box that are small and/or erratic (ie the irregular movement)
+Get average flow for the mask of the biggest one-color blob within the square
+Use average flow to see how much object moved
+If enough distance has been traveled, then generate text:
+- generate it at the end of the box, and find which side to anchor it relative to using lots of ifs and math mumbo-jumbo
+if points go out of bounds, try to handle that…somehow
