@@ -1,9 +1,29 @@
-Have user select box
-Do optical flow for whole image
-Do color segmentation of blog for similar parts inside pixels limited to area inside the ROI (the box)
+before video loop:
+Have user select box (as before w/ mouse callback)
+
+on each iteration of video loop:
+Do optical flow for whole image (farneback flow)
+Do color segmentation for similar parts inside pixels limited to area inside the ROI (the box) in the blob image
+    - how do we want to determine which colors are similar?
+    - some way of getting a set of the different colors in the ROI while ignoring colors that are close to each other
+    - most likely using k-means
 Ignore areas within the box that are small and/or erratic (ie the irregular movement)
+    - discard small blobs
+    - discard blobs that don't match the predominant color within the ROI
 Get average flow for the mask of the biggest one-color blob within the square
 Use average flow to see how much object moved
+    - calc Euclidean distance probably? or use magnitude of flow vector
 If enough distance has been traveled, then generate text:
 - generate it at the end of the box, and find which side to anchor it relative to using lots of ifs and math mumbo-jumbo
 if points go out of bounds, try to handle that…somehow
+    - figure out whether motion is more horizontal or vertical by checking if x or y flow is bigger in magnitude
+    - figure out left vs right or up vs down by checking sign of that flow
+        +x: moving right, -x: moving left
+        +y: moving down, -y: moving up
+    - text goes at opposite side. so if sign is positive, text goes at 0 (in x or y) + position of box
+        if sign is negative, text goes at (width/height of box) + position of box
+    - is text position defined as corner location or center location?
+
+- have a variable to store how far we've traveled since the last text insertion
+- draw text into a text image that gets blitted over every video frame
+- treat text as image instead of text object to make resizing to fit easier
