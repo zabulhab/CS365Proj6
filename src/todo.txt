@@ -4,6 +4,8 @@
     - keep the existing code for dense optical flow,
         but only pay attention to the values for the pixels in the object boundary
     - take convex hull of blob to determine where to put text
+- issues w/ getting correct contour to follow, b/c thesholding the original image
+  emphasizes the shadows instead of the objects
 
 - thinking about using color segmentation
     - segment into colors (using posterizing) & get each individual color (using unique)
@@ -12,9 +14,22 @@
 - troubleshooting
     - maybe instead of posterizing across all values, don't posterize in the value channel?
     - maybe just hue, even
+- issue: posterizing doesn't split into regions very well (perhaps could be refined)
 
 - or instead, have user draw a box around the object. and use average flow across the entire box instead
     - means no need for finding boundaries of object from color segmentation or contouring
+
+- unclear if should take average flow or max flow
+    - average does not work at all for hand example
+    - max works kinda but gets derailed easily right now
+
+- AAAAAAAAAAAAAAAAAAAA
+- getting from selected blob outline to text generation
+    - width of text from width of blob; height proportionately scaled
+    - get furthest point of outline on edge opposite direction of motion
+    - accumulate its optical flow until it has moved far enough that words fit
+        - draw word
+    - repeat until edge moves out of frame?
 
 - for inserting text:
     - get direction of movement from optical flow vector
@@ -26,4 +41,3 @@
         - alternatively, only insert the letters of the word that can fit
             - this is hard because letters have different thicknesses
         - alternatively, just shrink down the text so that it can fit
-    - 

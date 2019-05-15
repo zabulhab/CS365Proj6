@@ -220,8 +220,10 @@ def main(argv):
 			print(flow.shape)
 			print("YEESH", flow[box["y1"]:box["y2"], box["x1"]:box["x2"], 0].shape)
 			print()
-			boxAvgXFlow = np.mean( flow[box["y1"]:box["y2"], box["x1"]:box["x2"], 0] )
-			boxAvgYFlow = np.mean( flow[box["y1"]:box["y2"], box["x1"]:box["x2"], 1] )
+			# boxAvgXFlow = np.mean( flow[box["y1"]:box["y2"], box["x1"]:box["x2"], 0] )
+			# boxAvgYFlow = np.mean( flow[box["y1"]:box["y2"], box["x1"]:box["x2"], 1] )
+			boxAvgXFlow = np.max( flow[box["y1"]:box["y2"], box["x1"]:box["x2"], 0] )
+			boxAvgYFlow = np.max( flow[box["y1"]:box["y2"], box["x1"]:box["x2"], 1] )
 			print("average flow:", boxAvgXFlow, boxAvgYFlow)
 			
 			# move bbox
@@ -231,9 +233,16 @@ def main(argv):
 			box["y2"] += int(boxAvgYFlow)
 		
 			# draw moved box into blob image
-			print(type(box["y1"]), box["y1"])
 			for i in range(box["y1"], box["y2"]):
+				if i < 0 or i >= flow.shape[0]:
+					continue
+				
 				for j in range(box["x1"], box["x2"]):
+					if j < 0:
+						continue
+					if j >= flow.shape[1]:
+						break
+					
 					hsvBlobs[i, j, 0] = 255
 					hsvBlobs[i, j, 2] = 255
 		
