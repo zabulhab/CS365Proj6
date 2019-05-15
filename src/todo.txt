@@ -15,3 +15,15 @@
 
 - or instead, have user draw a box around the object. and use average flow across the entire box instead
     - means no need for finding boundaries of object from color segmentation or contouring
+
+- for inserting text:
+    - get direction of movement from optical flow vector
+    - calculate this angle every frame
+    - anchor text so the top of it is facing the direction of the vector
+    - have a set width and height for the text, and measure the width and height of the blob to see if it can fit
+    - put as much text as can fit (maybe convert the text to an image or use an image to start with?)
+    - crop the text where necessary (numpy slicing? Region Of Interest?)
+        - alternatively, only insert the letters of the word that can fit
+            - this is hard because letters have different thicknesses
+        - alternatively, just shrink down the text so that it can fit
+    - 
