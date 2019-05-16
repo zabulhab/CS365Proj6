@@ -18,44 +18,6 @@ green = (0, 255, 0)
 black = (0, 0, 0)
 
 '''
-Returns the biggest contour in the given hierarchy that contains the given point
-'''
-# def getContourFromInteriorPoint(point, contours, hierarchy):
-# 	largestContourIDX = 0
-# 	largestContourArea = 0
-# 	for i in range( len( contours ) ):
-# 		inContour = cv.pointPolygonTest( contours[i], point, False )  # False => don't measure distance to edge
-#
-# 		thisContourArea = cv.contourArea( contours[i] )
-# 		if inContour > 0 and thisContourArea > largestContourArea:
-# 			print("aaaah", inContour)
-# 			largestContourIDX = i
-# 			largestContourArea = thisContourArea
-#
-# 	if largestContourArea != 0:
-# 		return contours[largestContourIDX]
-# 	else:
-# 		return None
-
-# print("hierarchy", len(hierarchy))
-#
-# currentContour = None # current best match for contour containing this point
-# for idx in range(hierarchy.shape[1]):
-# 	c = contours[idx]
-# 	parent = hierarchy[0][idx][2]
-#
-# 	# -1 = outside contour, 0 = on contour, 1 = in contour
-# 	contourTest = cv.pointPolygonTest( c, point, False )  # False => don't measure distance to edge
-# 	if contourTest != -1: # if point is in/on contour
-# 		print("HERE I AM")
-# 		if parent == -1: # no parent
-# 			currentContour = c
-# 		else:
-# 			currentContour = contours[parent]
-#
-# return currentContour
-
-'''
 Mouse click callback function for initial frame window
 '''
 def onMouseClick( event, x, y, flags, param ):
@@ -63,24 +25,24 @@ def onMouseClick( event, x, y, flags, param ):
 	boxPts = param[ "boxPts" ]
 	
 	if event == cv.EVENT_LBUTTONDOWN:  # drag start
-		box = { "x1": int( x ), "y1": int( y ) }
+		box = { "col1": int( x ), "row1": int( y ) }
 		boxPts.append( box )
 	elif event == cv.EVENT_LBUTTONUP:  # drag end
 		thisBox = boxPts[ -1 ]
-		thisBox[ "x2" ] = x
-		thisBox[ "y2" ] = y
+		thisBox[ "col2" ] = x
+		thisBox[ "row2" ] = y
 		
-		#TODO: make it consistent for x1 < x2 and y1 < y2
+		#TODO: make it consistent for col1 < col2 and row1 < row2
 		
 		# draw box
-		cv.line( frame, (thisBox[ "x1" ], thisBox[ "y1" ]),
-				 (thisBox[ "x1" ], thisBox[ "y2" ]), green, thickness=2 )
-		cv.line( frame, (thisBox[ "x1" ], thisBox[ "y1" ]),
-				 (thisBox[ "x2" ], thisBox[ "y1" ]), green, thickness=2 )
-		cv.line( frame, (thisBox[ "x1" ], thisBox[ "y2" ]),
-				 (thisBox[ "x2" ], thisBox[ "y2" ]), green, thickness=2 )
-		cv.line( frame, (thisBox[ "x2" ], thisBox[ "y1" ]),
-				 (thisBox[ "x2" ], thisBox[ "y2" ]), green, thickness=2 )
+		cv.line( frame, (thisBox[ "col1" ], thisBox[ "row1" ]),
+				 (thisBox[ "col1" ], thisBox[ "row2" ]), green, thickness=2 )
+		cv.line( frame, (thisBox[ "col1" ], thisBox[ "row1" ]),
+				 (thisBox[ "col2" ], thisBox[ "row1" ]), green, thickness=2 )
+		cv.line( frame, (thisBox[ "col1" ], thisBox[ "row2" ]),
+				 (thisBox[ "col2" ], thisBox[ "row2" ]), green, thickness=2 )
+		cv.line( frame, (thisBox[ "col2" ], thisBox[ "row1" ]),
+				 (thisBox[ "col2" ], thisBox[ "row2" ]), green, thickness=2 )
 
 
 # TODO: should this be for selecting multiple or just one?
@@ -140,6 +102,11 @@ def main( argv ):
 	box = boxPts[0] # TODO: redo this when deciding whether to handle multiple boxes
 	input( "AHA" )  # temp just for pausing
 	
+	# resize text image to box width TODO: handle having different directions
+	textWidth = box["col2"] - box["col1"]
+	textHeight = int( text.shape[0] * textWidth/text.shape[1] )
+	text = cv.resize(text, (textWidth, textHeight))
+	
 	# initialize array for HSV representation of flow blobs
 	hsvBlobs = np.zeros_like( frame1 )
 	hsvBlobs[ ..., 1 ] = 255  # give all pixels 100% saturation
@@ -148,9 +115,6 @@ def main( argv ):
 	textImage = np.zeros_like( frame1 )
 	
 	distTraveledSinceLastText = 0.0
-	
-	#TODO: replace with actual image
-	whiteness = np.full((50, 250, 3), 255, np.uint8)
 	
 	# loop through frames until video is completed
 	while cap.isOpened( ):
@@ -162,7 +126,7 @@ def main( argv ):
 		
 		#TODO: this is hardcoded for reaching the bottom
 		# if object has reached bottom
-		if box["y2"] >= frame2.shape[0]:
+		if box["row2"] >= frame2.shape[0]:
 			break
 				
 		# calculate optical flow
@@ -185,7 +149,7 @@ def main( argv ):
 		#TODO: maybe an else for when the flow is really small
 		
 		# get ROI in blob image
-		blobROI = hsvBlobs[box["y1"]:box["y2"], box["x1"]:box["x2"]]
+		blobROI = hsvBlobs[box["row1"]:box["row2"], box["col1"]:box["col2"]]
 		
 		flattenedBlobROI = blobROI.reshape( (-1, 3) ) # reshape to array of 3-channel entries
 		flattenedBlobROI = np.float32( flattenedBlobROI ) # convert to np.float32
@@ -211,30 +175,31 @@ def main( argv ):
 		mask = cv.inRange( segmentedBlobROI, mostCommonColor, mostCommonColor )
 		
 		#TODO: this is just testing stuff
-		# frameROI = frame2[box["y1"]:box["y2"], box["x1"]:box["x2"]]
+		# frameROI = frame2[box["row1"]:box["row2"], box["col1"]:box["col2"]]
 		# result = cv.bitwise_and( frameROI, frameROI, mask=mask )
 		# cv.imshow("is this the mask", result)
 		# cv.waitKey(0)
 		
 		# get ROI in flow image
-		flowROI = flow[box["y1"]:box["y2"], box["x1"]:box["x2"]]
+		flowROI = flow[box["row1"]:box["row2"], box["col1"]:box["col2"]]
 		maskedFlow = flowROI[mask == 255]
 		
 		avgXFlow = np.mean( maskedFlow[...,0] )
 		avgYFlow = np.mean( maskedFlow[...,1] )
 		
 		distTraveledSinceLastText += math.sqrt(avgXFlow * avgXFlow + avgYFlow * avgYFlow)
+		# distTraveledSinceLastText += abs(avgYFlow)
 		print("traveled", distTraveledSinceLastText)
 		
 		# if another text instance will now fit
-		if distTraveledSinceLastText > 50.0:
+		if distTraveledSinceLastText > textHeight * 2:
 			# blit in text
-			x1 = box["x1"]
-			x2 = box["x1"] + text.shape[1]
-			y1 = box["y1"] - 75
-			y2 = box["y1"]
+			col1 = box["col1"]
+			col2 = box["col1"] + textWidth
+			row1 = box["row1"] - textHeight
+			row2 = box["row1"]
 			
-			textImage[y1:y2, x1:x2] = text
+			textImage[row1:row2, col1:col2] = text
 			
 			distTraveledSinceLastText = 0.0
 		
@@ -247,10 +212,10 @@ def main( argv ):
 		cv.imshow( 'frame2', frame2 )
 		
 		# move box by average flow
-		box["x1"] = int(box["x1"] + avgXFlow)
-		box["x2"] = int(box["x2"] + avgXFlow)
-		box["y1"] = int(box["y1"] + avgYFlow)
-		box["y2"] = int(box["y2"] + avgYFlow)
+		box["col1"] = int(box["col1"] + avgXFlow)
+		box["col2"] = int(box["col2"] + avgXFlow)
+		box["row1"] = int(box["row1"] + avgYFlow)
+		box["row2"] = int(box["row2"] + avgYFlow)
 		
 		# print("hallo", distTraveledSinceLastText)
 		# input()
