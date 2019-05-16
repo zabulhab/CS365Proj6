@@ -4,6 +4,9 @@ Opens a video file, tracks object motion in it,
 and generates text in the wake of the moving object(s)
 Adapted from the example: https://docs.opencv.org/3.4/d7/d8b/tutorial_py_lucas_kanade.html
 
+Includes code for getting the contour that contains a point, getting a box dragged by the user,
+thresholding the frame, color-segmenting/posterizing the frame, and displaying blob trails
+
 Zena Abulhab & Melody Mao
 CS365 Spring 2019
 Project 6
