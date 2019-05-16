@@ -1,6 +1,10 @@
 import cv2 as cv
 import numpy as np
-cap = cv.VideoCapture("../data/Highway_Surveillance_trimmed.mp4")
+import sys
+
+videoName = sys.argv[1]
+print("Opening", videoName)
+cap = cv.VideoCapture(videoName)
 ret, frame1 = cap.read()
 prvs = cv.cvtColor(frame1,cv.COLOR_BGR2GRAY)
 hsv = np.zeros_like(frame1)
