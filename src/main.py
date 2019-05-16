@@ -15,6 +15,7 @@ import numpy as np
 import math
 
 green = (0, 255, 0)
+black = (0, 0, 0)
 
 '''
 Returns the biggest contour in the given hierarchy that contains the given point
@@ -112,11 +113,18 @@ def selectObjects( frame ):
 
 def main( argv ):
 	# check for command-line argument
-	if len( argv ) < 2:
-		print( "Usage: python3 main.py [video filename]" )
+	if len( argv ) < 3:
+		print( "Usage: python3 main.py [video filename] [text filename]" )
 		exit( )
 	
-	cap = cv.VideoCapture( argv[ 1 ] )
+	# read in text image
+	text = cv.imread(argv[2])
+	if text is None:
+		print("Could not read in image:", argv[2])
+		exit()
+	
+	# open video file
+	cap = cv.VideoCapture( argv[1] )
 	
 	# check to make sure video opened successfully
 	if not cap.isOpened( ):
@@ -222,15 +230,21 @@ def main( argv ):
 		if distTraveledSinceLastText > 50.0:
 			# blit in text
 			x1 = box["x1"]
-			x2 = box["x1"] + whiteness.shape[1]
-			y1 = box["y1"] - 50
+			x2 = box["x1"] + text.shape[1]
+			y1 = box["y1"] - 75
 			y2 = box["y1"]
-			textImage[y1:y2, x1:x2] = whiteness
+			
+			textImage[y1:y2, x1:x2] = text
+			
 			distTraveledSinceLastText = 0.0
 		
 		# blit text image into frame and display it
-		display = cv.add( frame2, textImage )
-		cv.imshow( 'frame2', display )
+		textMask = 255 - cv.inRange( textImage, black, black )
+		textMask = np.where(textMask != 0)
+		frame2[ textMask[0], textMask[1] ] = textImage[ textMask[0], textMask[1]]
+		# frame2[textMask] = textImage[textMask]
+		# display = cv.add( frame2, textImage )
+		cv.imshow( 'frame2', frame2 )
 		
 		# move box by average flow
 		box["x1"] = int(box["x1"] + avgXFlow)
