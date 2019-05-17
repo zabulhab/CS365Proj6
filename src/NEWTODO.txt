@@ -26,4 +26,7 @@ if points go out of bounds, try to handle that…somehow
 
 ✓ have a variable to store how far we've traveled since the last text insertion
 ✓ draw text into a text image that gets blitted over every video frame
-- treat text as image instead of text object to make resizing to fit easier
+✓ treat text as image instead of text object to make resizing to fit easier
+
+- troubleshoot boxes/masks for Chica and my hand
+- maybe output video file

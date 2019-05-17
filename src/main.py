@@ -73,6 +73,160 @@ def selectObjects( frame ):
 	
 	return boxPts
 
+'''
+Calculates the average of the most common optical flow range
+between the given gray-scale frames within the given box,
+using the given (HSV) blob image
+'''
+def calcAvgFlow(prevGray, nextGray, hsvBlobs, box):
+	flow = cv.calcOpticalFlowFarneback( prevGray, nextGray, None, 0.5, 3, 15, 3, 5, 1.2, 0 )
+	
+	# get flow vector info to turn into HSV color info
+	mag, ang = cv.cartToPolar( flow[ ..., 0 ], flow[ ..., 1 ] )  # output: vector magnitudes, angles
+	
+	# if flow is big enough
+	# (ignores frames w/ almost no motion where very small flow values get normalized way too high,
+	# resulting in frames w/ confetti)
+	if mag.max( ) > 50.:
+		# vector angle => hue
+		angDegrees = ang * 180 / np.pi / 2  # convert radians to degrees
+		hsvBlobs[ ..., 0 ] = angDegrees
+		
+		# vector magnitude => value
+		hsvBlobs[ ..., 2 ] = cv.normalize( mag, None, 0, 255, cv.NORM_MINMAX )
+	# TODO: maybe an else for when the flow is really small
+	
+	# get ROI in blob image
+	blobROI = hsvBlobs[ box[ "row1" ]:box[ "row2" ], box[ "col1" ]:box[ "col2" ] ]
+	
+	flattenedBlobROI = blobROI.reshape( (-1, 3) )  # reshape to array of 3-channel entries
+	flattenedBlobROI = np.float32( flattenedBlobROI )  # convert to np.float32
+	
+	# define criteria, number of clusters(K) for k-means clustering
+	criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 10, 1.0)
+	K = 2
+	ret, labels, clusterCenters = cv.kmeans( flattenedBlobROI, K, None, criteria, 10, cv.KMEANS_RANDOM_CENTERS )
+	
+	# use k-means clustering for color segmentation of ROI
+	clusterCenters = np.uint8( clusterCenters )  # convert cluster center colors back into uint8
+	segmentedBlobROI = clusterCenters[ labels.flatten( ) ]
+	segmentedBlobROI = segmentedBlobROI.reshape( blobROI.shape )  # reshape to region dimensions (un-flatten)
+	
+	# get most common color in blob image ROI
+	(values, counts) = np.unique( labels, return_counts=True )
+	idxMostCommonLabel = np.argmax( counts )
+	idxMostCommonColor = values[ idxMostCommonLabel ]
+	mostCommonColor = clusterCenters[ idxMostCommonColor ]
+	
+	# TODO: make sure most common color is not basically black (as in hand example)
+	
+	mask = cv.inRange( segmentedBlobROI, mostCommonColor, mostCommonColor )
+	
+	# TODO: this is just testing stuff
+	# frameROI = frame2[box["row1"]:box["row2"], box["col1"]:box["col2"]]
+	# result = cv.bitwise_and( frameROI, frameROI, mask=mask )
+	# cv.imshow("is this the mask", result)
+	# cv.waitKey(0)
+	
+	# get ROI in flow image
+	flowROI = flow[ box[ "row1" ]:box[ "row2" ], box[ "col1" ]:box[ "col2" ] ]
+	maskedFlow = flowROI[ mask == 255 ]
+	
+	avgXFlow = np.mean( maskedFlow[ ..., 0 ] )
+	avgYFlow = np.mean( maskedFlow[ ..., 1 ] )
+	
+	return avgXFlow, avgYFlow
+
+'''
+Rotates the given image by the given angle without cutting the rotated version off
+to the original dimensions
+code from: https://www.pyimagesearch.com/2017/01/02/rotate-images-correctly-with-opencv-and-python/
+'''
+def rotate_bound(image, angle):
+	# grab the dimensions of the image and then determine the
+	# center
+	(h, w) = image.shape[:2]
+	(cX, cY) = (w // 2, h // 2)
+
+	# grab the rotation matrix (applying the negative of the
+	# angle to rotate clockwise), then grab the sine and cosine
+	# (i.e., the rotation components of the matrix)
+	M = cv.getRotationMatrix2D((cX, cY), -angle, 1.0)
+	cos = np.abs(M[0, 0])
+	sin = np.abs(M[0, 1])
+
+	# compute the new bounding dimensions of the image
+	nW = int((h * sin) + (w * cos))
+	nH = int((h * cos) + (w * sin))
+
+	# adjust the rotation matrix to take into account translation
+	M[0, 2] += (nW / 2) - cX
+	M[1, 2] += (nH / 2) - cY
+
+	# perform the actual rotation and return the image
+	return cv.warpAffine(image, M, (nW, nH))
+
+'''
+Determines the generated text's orientation and position (relative to the tracking box)
+from the given average initial flow, tracking box, and text image
+Returns the distance to travel before blitting in text,
+the relative position of the text image (its upper left corner),
+and the updated text image, text image width, and height
+'''
+def getTextDirAndPos( avgXFlow, avgYFlow, box, text ):
+	xFlowMag = abs( avgXFlow )
+	yFlowMag = abs( avgYFlow )
+	# figure out whether motion is more horizontal or vertical by checking if x or y flow is bigger in magnitude
+	boxWidth = box[ "col2" ] - box[ "col1" ]
+	boxHeight = box[ "row2" ] - box[ "row1" ]
+	if xFlowMag > yFlowMag:  # horizontal
+		textRowPosFromBox = 0.0  # top of text lines up with top of box
+		
+		# resize text image width to box height
+		textWidth = boxHeight
+		textHeight = int( text.shape[ 0 ] * textWidth / text.shape[ 1 ] )
+		text = cv.resize( text, (textWidth, textHeight) )
+		
+		# swap width and height because of rotation
+		temp = textWidth
+		textWidth = textHeight
+		textHeight = temp
+		
+		distToTravel = textWidth
+		
+		if avgXFlow < 0.0:  # moving left
+			textColPosFromBox = boxWidth  # left edge of text is at right edge of box
+			
+			# rotate text 90 degrees counterclockwise
+			text = rotate_bound( text, -90 )
+		else:  # moving right
+			textColPosFromBox = - textWidth  # left edge of text is 1 text-width away from left edge of box
+			
+			# rotate text 90 degrees clockwise
+			text = rotate_bound( text, 90 )
+	
+	else:  # vertical
+		textColPosFromBox = 0
+		
+		# resize text image width to box width
+		textWidth = boxWidth
+		textHeight = int( text.shape[ 0 ] * textWidth / text.shape[ 1 ] )
+		text = cv.resize( text, (textWidth, textHeight) )
+		
+		distToTravel = textHeight
+		
+		# no need to rotate text
+		
+		if avgYFlow < 0.0:  # moving up
+			textRowPosFromBox = boxHeight
+		else:  # moving down
+			textRowPosFromBox = - textHeight
+	
+	# ensure both relative positions are integer values
+	textRowPosFromBox = int( textRowPosFromBox )
+	textColPosFromBox = int( textColPosFromBox )
+	return distToTravel, textColPosFromBox, textRowPosFromBox, text, textWidth, textHeight
+
 def main( argv ):
 	# check for command-line argument
 	if len( argv ) < 3:
@@ -102,11 +256,6 @@ def main( argv ):
 	box = boxPts[0] # TODO: redo this when deciding whether to handle multiple boxes
 	input( "AHA" )  # temp just for pausing
 	
-	# resize text image to box width TODO: handle having different directions
-	textWidth = box["col2"] - box["col1"]
-	textHeight = int( text.shape[0] * textWidth/text.shape[1] )
-	text = cv.resize(text, (textWidth, textHeight))
-	
 	# initialize array for HSV representation of flow blobs
 	hsvBlobs = np.zeros_like( frame1 )
 	hsvBlobs[ ..., 1 ] = 255  # give all pixels 100% saturation
@@ -115,6 +264,32 @@ def main( argv ):
 	textImage = np.zeros_like( frame1 )
 	
 	distTraveledSinceLastText = 0.0
+	
+	# read in second frame to figure out which side the text should go on and resize text accordingly
+	ret, frame2 = cap.read( )
+	# stop immediately on a non-existent frame
+	if frame2 is None:
+		return
+
+	# calculate optical flow
+	nextGray = cv.cvtColor( frame2, cv.COLOR_BGR2GRAY )
+	avgXFlow, avgYFlow = calcAvgFlow( prevGray, nextGray, hsvBlobs, box )
+
+	distTraveledSinceLastText += math.sqrt( avgXFlow * avgXFlow + avgYFlow * avgYFlow )
+
+	#TODO: note that the code for checking the distance traveled and blitting in the text have been removed here
+
+	cv.imshow( 'frame2', frame2 )
+	
+	# move box by average flow
+	box[ "col1" ] = int( box[ "col1" ] + avgXFlow )
+	box[ "col2" ] = int( box[ "col2" ] + avgXFlow )
+	box[ "row1" ] = int( box[ "row1" ] + avgYFlow )
+	box[ "row2" ] = int( box[ "row2" ] + avgYFlow )
+	
+	distToTravel, textColPosFromBox, textRowPosFromBox, text, textWidth, textHeight = getTextDirAndPos( avgXFlow,
+																										avgYFlow, box,
+																										text )
 	
 	# loop through frames until video is completed
 	while cap.isOpened( ):
@@ -131,73 +306,18 @@ def main( argv ):
 				
 		# calculate optical flow
 		nextGray = cv.cvtColor( frame2, cv.COLOR_BGR2GRAY )
-		flow = cv.calcOpticalFlowFarneback( prevGray, nextGray, None, 0.5, 3, 15, 3, 5, 1.2, 0 )
-		
-		# get flow vector info to turn into HSV color info
-		mag, ang = cv.cartToPolar(flow[...,0], flow[...,1]) # output: vector magnitudes, angles
-
-		# if flow is big enough
-		# (ignores frames w/ almost no motion where very small flow values get normalized way too high,
-		# resulting in frames w/ confetti)
-		if mag.max() > 50.:
-			# vector angle => hue
-			angDegrees = ang*180/np.pi/2 # convert radians to degrees
-			hsvBlobs[...,0] = angDegrees
-
-			# vector magnitude => value
-			hsvBlobs[...,2] = cv.normalize( mag, None, 0, 255, cv.NORM_MINMAX )
-		#TODO: maybe an else for when the flow is really small
-		
-		# get ROI in blob image
-		blobROI = hsvBlobs[box["row1"]:box["row2"], box["col1"]:box["col2"]]
-		
-		flattenedBlobROI = blobROI.reshape( (-1, 3) ) # reshape to array of 3-channel entries
-		flattenedBlobROI = np.float32( flattenedBlobROI ) # convert to np.float32
-
-		# define criteria, number of clusters(K) for k-means clustering
-		criteria = (cv.TERM_CRITERIA_EPS + cv.TERM_CRITERIA_MAX_ITER, 10, 1.0)
-		K = 2
-		ret, labels, clusterCenters = cv.kmeans( flattenedBlobROI, K, None, criteria, 10, cv.KMEANS_RANDOM_CENTERS )
-
-		# use k-means clustering for color segmentation of ROI
-		clusterCenters = np.uint8( clusterCenters ) # convert cluster center colors back into uint8
-		segmentedBlobROI = clusterCenters[ labels.flatten( ) ]
-		segmentedBlobROI = segmentedBlobROI.reshape( blobROI.shape ) # reshape to region dimensions (un-flatten)
-		
-		# get most common color in blob image ROI
-		(values, counts) = np.unique( labels, return_counts=True )
-		idxMostCommonLabel = np.argmax( counts )
-		idxMostCommonColor = values[ idxMostCommonLabel ]
-		mostCommonColor = clusterCenters[idxMostCommonColor]
-		
-		#TODO: make sure most common color is not basically black (as in hand example)
-		
-		mask = cv.inRange( segmentedBlobROI, mostCommonColor, mostCommonColor )
-		
-		#TODO: this is just testing stuff
-		# frameROI = frame2[box["row1"]:box["row2"], box["col1"]:box["col2"]]
-		# result = cv.bitwise_and( frameROI, frameROI, mask=mask )
-		# cv.imshow("is this the mask", result)
-		# cv.waitKey(0)
-		
-		# get ROI in flow image
-		flowROI = flow[box["row1"]:box["row2"], box["col1"]:box["col2"]]
-		maskedFlow = flowROI[mask == 255]
-		
-		avgXFlow = np.mean( maskedFlow[...,0] )
-		avgYFlow = np.mean( maskedFlow[...,1] )
+		avgXFlow, avgYFlow = calcAvgFlow(prevGray, nextGray, hsvBlobs, box)
 		
 		distTraveledSinceLastText += math.sqrt(avgXFlow * avgXFlow + avgYFlow * avgYFlow)
-		# distTraveledSinceLastText += abs(avgYFlow)
-		print("traveled", distTraveledSinceLastText)
+		# print("traveled", distTraveledSinceLastText)
 		
 		# if another text instance will now fit
-		if distTraveledSinceLastText > textHeight * 2:
+		if distTraveledSinceLastText > distToTravel * 2:
 			# blit in text
-			col1 = box["col1"]
-			col2 = box["col1"] + textWidth
-			row1 = box["row1"] - textHeight
-			row2 = box["row1"]
+			col1 = box["col1"] + textColPosFromBox
+			col2 = box["col1"] + textColPosFromBox + textWidth
+			row1 = box["row1"] + textRowPosFromBox
+			row2 = box["row1"] + textRowPosFromBox + textHeight
 			
 			textImage[row1:row2, col1:col2] = text
 			
@@ -216,24 +336,6 @@ def main( argv ):
 		box["col2"] = int(box["col2"] + avgXFlow)
 		box["row1"] = int(box["row1"] + avgYFlow)
 		box["row2"] = int(box["row2"] + avgYFlow)
-		
-		# print("hallo", distTraveledSinceLastText)
-		# input()
-		
-		'''
-		- generate text at the end of the box, and find which side to anchor it relative to using lots of ifs and math mumbo-jumbo
-		if points go out of bounds, try to handle that…somehow
-			- figure out whether motion is more horizontal or vertical by checking if x or y flow is bigger in magnitude
-			- figure out left vs right or up vs down by checking sign of that flow
-				+x: moving right, -x: moving left
-				+y: moving down, -y: moving up
-			- text goes at opposite side. so if sign is positive, text goes at 0 (in x or y) + position of box
-				if sign is negative, text goes at (width/height of box) + position of box
-			- is text position defined as corner location or center location?
-		
-		where to resize text? b/c we only get flow in this loop
-		but we only want to use it to determine box edge to align to and resize text on the first time
-		'''
 		
 		# k = cv.waitKey(1000) & 0xff
 		k = cv.waitKey( 30 ) & 0xff
