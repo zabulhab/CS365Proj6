@@ -299,6 +299,7 @@ def main( argv ):
 																										text )
 	
 	# initialize video writer
+	videoOut = None
 	if writeVideo:
 		frame_width = int( cap.get( 3 ) )
 		frame_height = int( cap.get( 4 ) )
