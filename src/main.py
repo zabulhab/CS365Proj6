@@ -246,7 +246,7 @@ def main( argv ):
 	if not cap.isOpened( ):
 		print( "Error opening video stream or file" )
 		exit( -1 )
-	
+		
 	# read in first frame
 	ret, frame1 = cap.read( )
 	prevGray = cv.cvtColor( frame1, cv.COLOR_BGR2GRAY )
@@ -291,6 +291,14 @@ def main( argv ):
 																										avgYFlow, box,
 																										text )
 	
+	frame_width = int( cap.get( 3 ) )
+	frame_height = int( cap.get( 4 ) )
+	videoOut = cv.VideoWriter( 'result.avi', cv.VideoWriter_fourcc( 'M', 'J', 'P', 'G' ),
+							   10, (frame_width,frame_height) )
+	# Write the frame into the file 'output.avi'
+	videoOut.write( frame1 )
+	videoOut.write( frame2 )
+	
 	# loop through frames until video is completed
 	while cap.isOpened( ):
 		ret, frame2 = cap.read( )
@@ -331,6 +339,9 @@ def main( argv ):
 		# display = cv.add( frame2, textImage )
 		cv.imshow( 'frame2', frame2 )
 		
+		# write frame into video file
+		videoOut.write(frame2)
+		
 		# move box by average flow
 		box["col1"] = int(box["col1"] + avgXFlow)
 		box["col2"] = int(box["col2"] + avgXFlow)
@@ -346,6 +357,7 @@ def main( argv ):
 	
 	# clean up
 	cap.release( )
+	videoOut.release()
 	cv.destroyAllWindows( )
 
 
