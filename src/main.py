@@ -4,6 +4,11 @@ Opens a video file, tracks object motion in it,
 and generates text in the wake of the moving object(s)
 Adapted from the example: https://docs.opencv.org/3.4/d7/d8b/tutorial_py_lucas_kanade.html
 
+to run:
+python3 main.py [video filename] [text filename] [-w]
+The -w is optional. When present, it indicates that the user would like to write
+the text generation result out to a video file.
+
 Zena Abulhab & Melody Mao
 CS365 Spring 2019
 Project 6
@@ -19,21 +24,27 @@ black = (0, 0, 0)
 
 '''
 Mouse click callback function for initial frame window
+Detects a box dragged by the user and draws it onto the frame
 '''
 def onMouseClick( event, x, y, flags, param ):
 	frame = param[ "frame" ]
-	boxPts = param[ "boxPts" ]
+	thisBox = param[ "boxPts" ]
 	
 	if event == cv.EVENT_LBUTTONDOWN:  # drag start
-		box = { "col1": int( x ), "row1": int( y ) }
-		boxPts.append( box )
+		thisBox[ "col1" ] = x
+		thisBox[ "row1" ] = y
 	elif event == cv.EVENT_LBUTTONUP:  # drag end
-		thisBox = boxPts[ -1 ]
 		thisBox[ "col2" ] = x
 		thisBox[ "row2" ] = y
 		
-		#TODO: make it consistent for col1 < col2 and row1 < row2
-		
+		# ensure col1 < col2 and row1 < row2; swap if not
+		if thisBox["col1"] > thisBox["col2"]:
+			thisBox["col2"] = thisBox["col1"]
+			thisBox["col1"] = x
+		if thisBox["row1"] > thisBox["row2"]:
+			thisBox["row2"] = thisBox["row1"]
+			thisBox["row1"] = y
+				
 		# draw box
 		cv.line( frame, (thisBox[ "col1" ], thisBox[ "row1" ]),
 				 (thisBox[ "col1" ], thisBox[ "row2" ]), green, thickness=2 )
@@ -44,27 +55,25 @@ def onMouseClick( event, x, y, flags, param ):
 		cv.line( frame, (thisBox[ "col2" ], thisBox[ "row1" ]),
 				 (thisBox[ "col2" ], thisBox[ "row2" ]), green, thickness=2 )
 
-
-# TODO: should this be for selecting multiple or just one?
 '''
 Handles initial phase when user drags a box on the first frame
 to select the object to track
 '''
 def selectObjects( frame ):
-	frameCopy = frame.copy( )
+	frameCopy = frame.copy( ) # copy of frame to draw boxes onto
 	
 	cv.namedWindow( "initial frame" )
-	boxPts = []
+	boxPts = {}
 	param = { "boxPts": boxPts, "frame": frameCopy }
 	cv.setMouseCallback( "initial frame", onMouseClick, param )
 	
 	# keep looping until the 'q' key is pressed
 	while True:
-		# display the image and wait for a keypress
+		# display the image
 		cv.imshow( "initial frame", frameCopy )
-		key = cv.waitKey( 1 ) & 0xFF
 		
 		# if the 'q' key is pressed, break from the loop
+		key = cv.waitKey( 1 ) & 0xFF
 		if key == ord( "q" ):
 			break
 	
@@ -76,7 +85,7 @@ def selectObjects( frame ):
 '''
 Calculates the average of the most common optical flow range
 between the given gray-scale frames within the given box,
-using the given (HSV) blob image
+using the given (HSV) flow blob image
 '''
 def calcAvgFlow(prevGray, nextGray, hsvBlobs, box):
 	flow = cv.calcOpticalFlowFarneback( prevGray, nextGray, None, 0.5, 3, 15, 3, 5, 1.2, 0 )
@@ -94,7 +103,8 @@ def calcAvgFlow(prevGray, nextGray, hsvBlobs, box):
 		
 		# vector magnitude => value
 		hsvBlobs[ ..., 2 ] = cv.normalize( mag, None, 0, 255, cv.NORM_MINMAX )
-	# TODO: maybe an else for when the flow is really small
+	else:
+		hsvBlobs[...,2] = 0
 	
 	# get ROI in blob image
 	blobROI = hsvBlobs[ box[ "row1" ]:box[ "row2" ], box[ "col1" ]:box[ "col2" ] ]
@@ -118,20 +128,13 @@ def calcAvgFlow(prevGray, nextGray, hsvBlobs, box):
 	idxMostCommonColor = values[ idxMostCommonLabel ]
 	mostCommonColor = clusterCenters[ idxMostCommonColor ]
 	
-	# TODO: make sure most common color is not basically black (as in hand example)
-	
 	mask = cv.inRange( segmentedBlobROI, mostCommonColor, mostCommonColor )
-	
-	# TODO: this is just testing stuff
-	# frameROI = frame2[box["row1"]:box["row2"], box["col1"]:box["col2"]]
-	# result = cv.bitwise_and( frameROI, frameROI, mask=mask )
-	# cv.imshow("is this the mask", result)
-	# cv.waitKey(0)
 	
 	# get ROI in flow image
 	flowROI = flow[ box[ "row1" ]:box[ "row2" ], box[ "col1" ]:box[ "col2" ] ]
 	maskedFlow = flowROI[ mask == 255 ]
 	
+	# calculate averages
 	avgXFlow = np.mean( maskedFlow[ ..., 0 ] )
 	avgYFlow = np.mean( maskedFlow[ ..., 1 ] )
 	
@@ -170,17 +173,19 @@ def rotate_bound(image, angle):
 Determines the generated text's orientation and position (relative to the tracking box)
 from the given average initial flow, tracking box, and text image
 Returns the distance to travel before blitting in text,
-the relative position of the text image (its upper left corner),
-and the updated text image, text image width, and height
+the position of the text image (its upper left corner) relative to the tracking box,
+the updated text image, and the dimensions of the box the text image is drawn in
 '''
 def getTextDirAndPos( avgXFlow, avgYFlow, box, text ):
 	xFlowMag = abs( avgXFlow )
 	yFlowMag = abs( avgYFlow )
-	# figure out whether motion is more horizontal or vertical by checking if x or y flow is bigger in magnitude
+	
 	boxWidth = box[ "col2" ] - box[ "col1" ]
 	boxHeight = box[ "row2" ] - box[ "row1" ]
+	
+	# figure out whether motion is more horizontal or vertical by checking if x or y flow is bigger in magnitude
 	if xFlowMag > yFlowMag:  # horizontal
-		textRowPosFromBox = 0.0  # top of text lines up with top of box
+		textRowPosFromBox = 0  # top of text lines up with top of box
 		
 		# resize text image width to box height
 		textWidth = boxHeight
@@ -215,12 +220,12 @@ def getTextDirAndPos( avgXFlow, avgYFlow, box, text ):
 		
 		distToTravel = textHeight
 		
-		# no need to rotate text
+		# note: no need to rotate text
 		
 		if avgYFlow < 0.0:  # moving up
-			textRowPosFromBox = boxHeight
+			textRowPosFromBox = boxHeight # top of text lines up with bottom of box
 		else:  # moving down
-			textRowPosFromBox = - textHeight
+			textRowPosFromBox = - textHeight # top of text is 1 text-height above top of box
 	
 	# ensure both relative positions are integer values
 	textRowPosFromBox = int( textRowPosFromBox )
@@ -230,7 +235,7 @@ def getTextDirAndPos( avgXFlow, avgYFlow, box, text ):
 def main( argv ):
 	# check for command-line argument
 	if len( argv ) < 3:
-		print( "Usage: python3 main.py [video filename] [text filename]" )
+		print( "Usage: python3 main.py [video filename] [text filename] [-w]" )
 		exit( )
 	
 	# read in text image
@@ -246,15 +251,19 @@ def main( argv ):
 	if not cap.isOpened( ):
 		print( "Error opening video stream or file" )
 		exit( -1 )
-		
+	
+	# check whether to write out video
+	writeVideo = False
+	if len(argv) > 3 and argv[3] == "-w":
+		writeVideo = True
+	
 	# read in first frame
 	ret, frame1 = cap.read( )
 	prevGray = cv.cvtColor( frame1, cv.COLOR_BGR2GRAY )
 	
 	# have user draw box to select object
-	boxPts = selectObjects( frame1 )
-	box = boxPts[0] # TODO: redo this when deciding whether to handle multiple boxes
-	input( "AHA" )  # temp just for pausing
+	box = selectObjects( frame1 )
+	input( "Press enter to start text generation" )
 	
 	# initialize array for HSV representation of flow blobs
 	hsvBlobs = np.zeros_like( frame1 )
@@ -277,8 +286,6 @@ def main( argv ):
 
 	distTraveledSinceLastText += math.sqrt( avgXFlow * avgXFlow + avgYFlow * avgYFlow )
 
-	#TODO: note that the code for checking the distance traveled and blitting in the text have been removed here
-
 	cv.imshow( 'frame2', frame2 )
 	
 	# move box by average flow
@@ -291,13 +298,15 @@ def main( argv ):
 																										avgYFlow, box,
 																										text )
 	
-	frame_width = int( cap.get( 3 ) )
-	frame_height = int( cap.get( 4 ) )
-	videoOut = cv.VideoWriter( 'result.avi', cv.VideoWriter_fourcc( 'M', 'J', 'P', 'G' ),
-							   10, (frame_width,frame_height) )
-	# Write the frame into the file 'output.avi'
-	videoOut.write( frame1 )
-	videoOut.write( frame2 )
+	# initialize video writer
+	if writeVideo:
+		frame_width = int( cap.get( 3 ) )
+		frame_height = int( cap.get( 4 ) )
+		videoOut = cv.VideoWriter( 'result.avi', cv.VideoWriter_fourcc( 'M', 'J', 'P', 'G' ),
+								   10, (frame_width,frame_height) )
+		# Write the frame into the file
+		videoOut.write( frame1 )
+		videoOut.write( frame2 )
 	
 	# loop through frames until video is completed
 	while cap.isOpened( ):
@@ -307,9 +316,14 @@ def main( argv ):
 		if frame2 is None:
 			break
 		
-		#TODO: this is hardcoded for reaching the bottom
-		# if object has reached bottom
-		if box["row2"] >= frame2.shape[0]:
+		# check if object is about to go out of frame
+		if box["row1"] <= 0: # if object has reached top
+			break
+		if box["row2"] >= frame2.shape[0]: # if object has reached bottom
+			break
+		if box["col1"] <= 0: # if object has reached left edge
+			break
+		if box["col2"] >= frame2.shape[1]: # if object has reached right edge
 			break
 				
 		# calculate optical flow
@@ -317,7 +331,6 @@ def main( argv ):
 		avgXFlow, avgYFlow = calcAvgFlow(prevGray, nextGray, hsvBlobs, box)
 		
 		distTraveledSinceLastText += math.sqrt(avgXFlow * avgXFlow + avgYFlow * avgYFlow)
-		# print("traveled", distTraveledSinceLastText)
 		
 		# if another text instance will now fit
 		if distTraveledSinceLastText > distToTravel * 2:
@@ -335,12 +348,12 @@ def main( argv ):
 		textMask = 255 - cv.inRange( textImage, black, black )
 		textMask = np.where(textMask != 0)
 		frame2[ textMask[0], textMask[1] ] = textImage[ textMask[0], textMask[1]]
-		# frame2[textMask] = textImage[textMask]
-		# display = cv.add( frame2, textImage )
+		
 		cv.imshow( 'frame2', frame2 )
 		
 		# write frame into video file
-		videoOut.write(frame2)
+		if writeVideo:
+			videoOut.write(frame2)
 		
 		# move box by average flow
 		box["col1"] = int(box["col1"] + avgXFlow)
@@ -348,7 +361,6 @@ def main( argv ):
 		box["row1"] = int(box["row1"] + avgYFlow)
 		box["row2"] = int(box["row2"] + avgYFlow)
 		
-		# k = cv.waitKey(1000) & 0xff
 		k = cv.waitKey( 30 ) & 0xff
 		if k == ord('q'):
 			break
